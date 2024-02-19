@@ -2,92 +2,95 @@ from fastapi import FastAPI,Response,HTTPException,status
 from pydantic import BaseModel
 from typing import Optional
 import random
+import psycopg2
+from psycopg2.extras import RealDictCursor
+import time
 
-class Id:
-    def __init__(self) -> None:
-        self.ids = [1,2] 
-
-    def create_id(self):
-        new_id = random.randint(100,10000000)
-        if new_id in self.ids:
-            new_id = random.randint(new_id+1,10000000)
-
-        self.ids.append(new_id)
-        return new_id
-
+#connecting to the database
+while True:
+    try:
+        db = psycopg2.connect(host='localhost', database='fastAPI', user = 'postgres',
+                            password='pahul123', cursor_factory=RealDictCursor)
+        cursor = db.cursor()
+        print("\nConnected to Database!!\n")
+        break
+    except Exception as error:
+        print("Connection Failed!")
+        print("Error: ", error)
+        time.sleep(2)
 
 class Post(BaseModel):
     title: str
     content: str
     publish: bool = True
-    rating: int = None
     id: int = None
-
-posts = [{"title":"Title of post 1","content":"content of post 1","id":1},
-         {"title":"Title of post 2","content":"content of post 2","id":2}]
-
-def find_post(id):
-    for p in posts:
-        if p["id"] == int(id):
-            return [p,True]
-    return [f"No Post of id = {id} where found",False]
-
-def find_post_id_index(id):
-    for i,p in enumerate(posts):
-        if p["id"] == id:
-            return i
 
 app = FastAPI()
 
-id_data = Id()
 
 def returns_ID(dict):
     return dict["id"]
 
-for i in range(100):
-    posts.append({"title": f"test post {i}","content":"content for post","id": id_data.create_id()})
-    posts.sort(key=returns_ID)
-
-@app.get("/posts") # .get for sending a respose to "get requests" from the browser at "/" path
+@app.get("/posts") # .get for sending a respose to "get requests" from the browser at "/" path 
 def get_posts():
-    return [{"total_posts":len(posts)},{"message":posts}] #the message we are sending
+    try:
+        cursor.execute("SELECT * FROM posts;")
+        posts = cursor.fetchall()
+        db.commit()
+        return posts
+    except Exception as error:
+        print(error)
+        db.rollback()
+        return {"message":"Posts could not be found"} #the message we are sending in case of failure
 
 @app.post("/posts",status_code=status.HTTP_201_CREATED)
 def create_post(post : Post):
     post_dict = post.dict()
-    post_dict["id"] = id_data.create_id()
-    posts.append(post_dict)
-    return {"Post created":post_dict}
+    try:
+        cursor.execute("INSERT INTO posts (title, content, publish) VALUES (%s,%s,%s) RETURNING *;",
+                    (post_dict['title'],post_dict['content'],post_dict['publish']))  # %s to prevent SQL injection attacks
+        db.commit()
+        return {"Post created":post_dict}
+    except Exception as error:
+        db.rollback()
+        return {"message": f"Post could not be created due to {error}"}
 
 @app.get("/posts/{id}")
 def get_post(id : int):
-    found = find_post(id)
-    if not found[1]:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=found[0])
-        pass
-    return found[0]
+    try:
+        cursor.execute("SELECT * FROM posts WHERE id = %s;", (id,))
+        found = cursor.fetchall()[0] #--> dict
+        db.commit()
+        return found
+    except Exception as error:
+        print("ERROR: ",error)
+        return {"Message":"Post not found"}
 
 
 @app.delete("/posts/{id}",status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(id : int):
-    index = find_post_id_index(id)
-    if index:
-        posts.pop(index)
-        return "Deleted post"
-    raise HTTPException(status.HTTP_404_NOT_FOUND,detail="ERROR: Post Not Found")
+    try:
+        cursor.execute("DELETE FROM posts WHERE id = %s;",(id,))
+        db.commit()
+        return {"message":"post deleted"}
+    except Exception as error:
+        db.rollback()
+        return {"message":error}
 
 @app.put("/posts/{id}")
 def update_posts(id : int, post : Post):
-    print(post)
-    found = find_post(id)
-    if not found[1]:
-        raise HTTPException(status.HTTP_404_NOT_FOUND,f"Any Post with id {id} could not found")
-    index = find_post_id_index(id)
-    posts.pop(index)
-    post_dict = post.dict()
-    post_dict["id"] = id
-    posts.insert(index,post_dict)
-    return {"message":"updated post"}
+    try:
+        post = post.dict()
+        cursor.execute("UPDATE posts SET title=%s, content = %s,publish = %s WHERE id = %s RETURNING *;",
+                        (post['title'], post['content'],post['publish'],id))
+        updated_post = cursor.fetchall()
+        db.commit()
+        return updated_post
+    except Exception as error:
+        print(error)
+        db.rollback()
+        return {"message": "Post could not be found"}
+    
  
 # to run the server: uvicorn main:app
 #main - name of the py file
