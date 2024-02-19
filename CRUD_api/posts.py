@@ -1,7 +1,5 @@
-from fastapi import FastAPI,Response,HTTPException,status
+from fastapi import FastAPI,HTTPException,status
 from pydantic import BaseModel
-from typing import Optional
-import random
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
@@ -27,10 +25,6 @@ class Post(BaseModel):
 
 app = FastAPI()
 
-
-def returns_ID(dict):
-    return dict["id"]
-
 @app.get("/posts") # .get for sending a respose to "get requests" from the browser at "/" path 
 def get_posts():
     try:
@@ -41,6 +35,7 @@ def get_posts():
     except Exception as error:
         print(error)
         db.rollback()
+        HTTPException(status_code=status.HTTP_404_NOT_FOUND)
         return {"message":"Posts could not be found"} #the message we are sending in case of failure
 
 @app.post("/posts",status_code=status.HTTP_201_CREATED)
@@ -53,7 +48,8 @@ def create_post(post : Post):
         return {"Post created":post_dict}
     except Exception as error:
         db.rollback()
-        return {"message": f"Post could not be created due to {error}"}
+        HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return {"message": f"Post could not be created due to {error}"}    
 
 @app.get("/posts/{id}")
 def get_post(id : int):
@@ -64,6 +60,7 @@ def get_post(id : int):
         return found
     except Exception as error:
         print("ERROR: ",error)
+        HTTPException(status_code=status.HTTP_404_NOT_FOUND)
         return {"Message":"Post not found"}
 
 
@@ -75,6 +72,7 @@ def delete_post(id : int):
         return {"message":"post deleted"}
     except Exception as error:
         db.rollback()
+        HTTPException(status_code=status.HTTP_404_NOT_FOUND)
         return {"message":error}
 
 @app.put("/posts/{id}")
@@ -89,6 +87,7 @@ def update_posts(id : int, post : Post):
     except Exception as error:
         print(error)
         db.rollback()
+        HTTPException(status_code=status.HTTP_404_NOT_FOUND)
         return {"message": "Post could not be found"}
     
  
