@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
-from users import Users,user
+from users import *
 
 #connecting to the database
 while True:
@@ -28,6 +28,17 @@ app = FastAPI()
 
 users = Users(db,app)
 
+@app.post('/users/login')
+def login_user(payLoad:login_details):
+    payLoad = payLoad.dict()
+    email = payLoad['email_id']
+    password = payLoad['password']
+    return users.user_login(email,password)
+
+@app.post('users/logout')
+def logout_user():
+    return users.user_logout()
+
 @app.post('/users/create')
 def create_user(user_data:user):
     return users.create_user(user_data)
@@ -39,6 +50,8 @@ def get_users():
 @app.get('/users/{id}')
 def get_a_user(id:int):
     return users.get_users(id)
+
+
 
 @app.get("/posts") # .get for sending a respose to "get requests" from the browser at "/" path 
 def get_posts():
