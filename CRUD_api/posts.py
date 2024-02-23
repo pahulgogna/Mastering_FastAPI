@@ -35,7 +35,7 @@ def login_user(payLoad:login_details):
     password = payLoad['password']
     return users.user_login(email,password)
 
-@app.post('users/logout')
+@app.post('/users/logout')
 def logout_user():
     return users.user_logout()
 

@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from fastapi import HTTPException,status
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel
 from posts import *
@@ -89,6 +89,8 @@ class Users:
             self.cursor.execute('SELECT name,user_id,posts FROM users WHERE user_id = %s;',(id,))
             user_data = self.cursor.fetchall()
             self.db.commit()
+            if user_data == []:
+                return {'message':"User not found"}
             return user_data
         except Exception as error:
             return {'message':error}
@@ -99,28 +101,31 @@ class Users:
             data = self.cursor.fetchall()
             if data != []:
                 self.db.rollback()
+                HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
                 return {"message": "A user is already logged in"}
             
             self.cursor.execute('SELECT * FROM users WHERE email_id = %s',(email_id,))
             matched = self.cursor.fetchall()
+            # matched = matched.dict()
+            matched = matched[0]
             print(matched)
-            if matched != []:
+            if matched:
                 if password == basic_encryption(key, matched['password'],False):
                     self.cursor.execute('UPDATE users SET logged_in = true WHERE email_id = %s',(email_id,))
                     login.user(email_id)
                     self.db.commit()
-                    print('logged in')
                     return {'message':'logged in successfully'}
                 
                 else:
                     self.db.rollback()
                     print('else')
+                    HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
                     return {"message":"Wrong password"}
-
-            else:
-                print('outsude')
-                self.db.rollback()
-                return {"message":"user not found"}
+                
+            print('outsude')
+            HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+            self.db.rollback()
+            return {"message":"user not found"}
             
         except Exception as error:
             self.db.rollback()
