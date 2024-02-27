@@ -1,10 +1,9 @@
 from fastapi import HTTPException,status
-from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel
 from posts import *
 import pickle
 
-def store_log(data,write:bool):
+def store_log(write:bool,data=None):
     if write:
         with open("login_data/data.pkl",'wb') as f:
             pickle.dump(data,f)
@@ -22,10 +21,10 @@ class logged_in:
 
     def user(self,email:str):
         self.__email = email
-        store_log(self.__email,True)
+        store_log(True,data=self.__email)
 
     def user_logged_in(self):
-        return store_log(None, False)
+        return store_log(False)
 
 login = logged_in()
 

@@ -1,6 +1,6 @@
 from fastapi import FastAPI,HTTPException,status
 from pydantic import BaseModel
-from users import *
+import users
 
 class Post(BaseModel):
     title: str
@@ -28,9 +28,19 @@ class Posts:
 
     def create_post(self,post : Post):
         post_dict = post.dict()
+
+        if not users.login.user_logged_in():
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="You need to be logged in to create posts")
+        
         try:
             self.cursor.execute("INSERT INTO posts (title, content, publish) VALUES (%s,%s,%s) RETURNING *;",
                         (post_dict['title'],post_dict['content'],post_dict['publish']))  # %s to prevent SQL injection attacks
+            
+            data = self.cursor.fetchall()[0]
+
+            self.cursor.execute("UPDATE users SET posts = array_append(posts, %s) WHERE email_id = %s",
+                                 (data['id'],users.login.user_logged_in()))
+            
             self.db.commit()
             return {"Post created":post_dict}
         except Exception as error:
@@ -50,6 +60,9 @@ class Posts:
 
 
     def delete_post(self,id : int):
+        if not users.login.user_logged_in():
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="You need to be logged in")
+        
         try:
             self.cursor.execute("DELETE FROM posts WHERE id = %s;",(id,))
             self.db.commit()
@@ -59,6 +72,8 @@ class Posts:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail= error)
 
     def update_posts(self,id : int, post : Post):
+        if not users.login.user_logged_in():
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="You need to be logged in")
         try:
             post = post.dict()
             self.cursor.execute("UPDATE posts SET title=%s, content = %s,publish = %s WHERE id = %s RETURNING *;",
