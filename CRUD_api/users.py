@@ -2,6 +2,19 @@ from fastapi import HTTPException,status
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel
 from posts import *
+import pickle
+
+def store_log(data,write:bool):
+    if write:
+        with open("login_data/data.pkl",'wb') as f:
+            pickle.dump(data,f)
+    else:
+        try:
+            with open("login_data/data.pkl",'rb') as f:
+                return pickle.load(f)
+        except:
+             with open("login_data/data.pkl",'wb') as f:
+                pickle.dump(data,f)
 
 class logged_in:
     def __init__(self) -> None:
@@ -9,9 +22,10 @@ class logged_in:
 
     def user(self,email:str):
         self.__email = email
+        store_log(self.__email,True)
 
     def user_logged_in(self):
-        return self.__email
+        return store_log(None, False)
 
 login = logged_in()
 
@@ -106,7 +120,7 @@ class Users:
                     self.cursor.execute('UPDATE users SET logged_in = true WHERE email_id = %s',(email_id,))
                     login.user(email_id)
                     self.db.commit()
-                    return {'message':'logged in successfully'}
+                    return {'message':'logged in successfully'}   
                 
                 else:
                     self.db.rollback()
