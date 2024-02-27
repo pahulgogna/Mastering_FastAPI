@@ -5,15 +5,13 @@ from posts import *
 
 class logged_in:
     def __init__(self) -> None:
-        self.email = None
-    def user(self,email):
-        self.email = email
+        self.__email = False
+
+    def user(self,email:str):
+        self.__email = email
 
     def user_logged_in(self):
-        if self.email:
-            return self.email
-        else:
-            return False
+        return self.__email
 
 login = logged_in()
 
@@ -42,10 +40,9 @@ def basic_encryption(n:int,password:str,hash:bool) -> str:
     return out
 
 class Users:
-    def __init__(self,db,app) -> None:
+    def __init__(self,db) -> None:
         self.db = db
         self.cursor = db.cursor()
-        self.app = app
 
     def create_user(self, user_data : user) -> dict:
         try:
@@ -57,16 +54,16 @@ class Users:
                 pass
             else:
                 self.db.rollback()
-                return {'message':"email already registered"}
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="email already registered")
             
-            self.cursor.execute('INSERT INTO users (name,email_id,password,posts,logged_in) VALUES (%s,%s,%s,%s,true) RETURNING *'
+            self.cursor.execute('INSERT INTO users (name,email_id,password,posts) VALUES (%s,%s,%s,%s) RETURNING *'
                                 ,(user_data['name'],user_data['email_id'],
                                 basic_encryption(key,user_data['password'],True)
                                 ,user_data['posts']))
             
             user_created = self.cursor.fetchall()
-            login.user(user_data['email_id'])
             self.db.commit()
+            self.user_login(user_data['email_id'],user_data['password'])
             return user_created
         
         except Exception as error:
@@ -96,19 +93,14 @@ class Users:
             return {'message':error}
     
     def user_login(self,email_id:str, password:str):
+
         try:
-            self.cursor.execute('SELECT * FROM users WHERE logged_in = true')
-            data = self.cursor.fetchall()
-            if data != []:
-                self.db.rollback()
-                HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-                return {"message": "A user is already logged in"}
+            if login.user_logged_in():
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="A user is already logged in")
             
             self.cursor.execute('SELECT * FROM users WHERE email_id = %s',(email_id,))
             matched = self.cursor.fetchall()
-            # matched = matched.dict()
             matched = matched[0]
-            print(matched)
             if matched:
                 if password == basic_encryption(key, matched['password'],False):
                     self.cursor.execute('UPDATE users SET logged_in = true WHERE email_id = %s',(email_id,))
@@ -118,33 +110,27 @@ class Users:
                 
                 else:
                     self.db.rollback()
-                    print('else')
-                    HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-                    return {"message":"Wrong password"}
-                
-            print('outsude')
-            HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+                    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Wrong password")
+                                
             self.db.rollback()
-            return {"message":"user not found"}
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="user not found")
             
         except Exception as error:
             self.db.rollback()
-            return {"message": error}
-        
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=str(error)[4:])        
 
     def user_logout(self):
         try:
-            self.cursor.execute('SELECT * FROM users WHERE logged_in = true')
-            data = self.cursor.fetchall()
-            if data == []:
+            if not login.user_logged_in():
                 self.db.rollback()
-                return {"message": "No user is logged in"}
-            
-            self.cursor.execute('UPDATE users SET logged_in = false WHERE logged_in = true')
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail= "You are not logged in")
+                        
+            self.cursor.execute('UPDATE users SET logged_in = false WHERE email_id = %s',(login.user_logged_in(),))
             self.db.commit()
+            login.user(False)
             return {'message': "the user was logged out"}
 
 
         except Exception as error:
             self.db.rollback()
-            return {"message": error}
+            return error
