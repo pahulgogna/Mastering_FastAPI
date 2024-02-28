@@ -5,12 +5,13 @@ from psycopg2.extras import RealDictCursor
 import time
 from users import *
 from posts import *
+import keys
 
 #connecting to the database
 while True:
     try:
         db = psycopg2.connect(host='localhost', database='fastAPI', user = 'postgres',
-                            password='pahul123', cursor_factory=RealDictCursor)
+                            password = keys.dbPassword, cursor_factory=RealDictCursor)
         cursor = db.cursor()
         print("\nConnected to Database!!\n")
         break
@@ -64,7 +65,7 @@ def delete_post(id:int):
     return posts.delete_post(id)
 
 @app.put("/posts/{id}")
-def update_a_post(id, post = Post):
+def update_a_post(id:int, post:Post):
     return posts.update_posts(id, post)
 
 

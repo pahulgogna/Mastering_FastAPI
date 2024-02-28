@@ -2,6 +2,7 @@ from fastapi import HTTPException,status
 from pydantic import BaseModel
 from posts import *
 import pickle
+from keys import key
 
 def store_log(write:bool,data=None):
     if write:
@@ -39,7 +40,6 @@ class login_details(BaseModel):
     email_id : str
     password : str
 
-key = 1423
 
 def basic_encryption(n:int,password:str,hash:bool) -> str: 
     if hash:
