@@ -1,11 +1,14 @@
 from fastapi import FastAPI,HTTPException,status
-from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
 from users import *
 from posts import *
 import keys
+import models
+# from database import engine
+
+# models.Base.metadata.create_all(bind=engine)
 
 #connecting to the database
 while True:

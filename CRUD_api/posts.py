@@ -1,6 +1,9 @@
-from fastapi import FastAPI,HTTPException,status
+from fastapi import FastAPI,HTTPException,status, Depends
 from pydantic import BaseModel
 import users
+from database import get_db
+from sqlalchemy.orm import Session
+import models
 
 class Post(BaseModel):
     title: str
@@ -15,11 +18,12 @@ class Posts:
         self.db = db
         self.cursor = self.db.cursor()
 
-    def get_posts(self):
+    def get_posts(self,db: Session = Depends(get_db)):
         try:
-            self.cursor.execute("SELECT * FROM posts;")
-            posts = self.cursor.fetchall()
-            self.db.commit()
+            posts = db.query(models.Posts).all()
+            # self.cursor.execute("SELECT * FROM posts;")
+            # posts = self.cursor.fetchall()
+            # self.db.commit()
             return posts
         except Exception as error:
             print(error)

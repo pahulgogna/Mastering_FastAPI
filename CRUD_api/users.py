@@ -1,5 +1,5 @@
 from fastapi import HTTPException,status
-from pydantic import BaseModel
+from pydantic import BaseModel,EmailStr
 from posts import *
 import pickle
 from keys import key
@@ -31,13 +31,13 @@ login = logged_in()
 
 class user(BaseModel):
     name: str
-    email_id: str
+    email_id: EmailStr
     password: str
     posts : list = []
     user_id : int = None
 
 class login_details(BaseModel):
-    email_id : str
+    email_id : EmailStr
     password : str
 
 
@@ -60,7 +60,7 @@ class Users:
     def create_user(self, user_data : user) -> dict:
         try:
             user_data = user_data.dict()
-            self.cursor.execute('SELECT name FROM users WHERE email_id = %s',(user_data['email_id'],))
+            self.cursor.execute('SELECT name FROM users WHERE email_id = %s ',(user_data['email_id'],))
             matches = self.cursor.fetchall()
             
             if matches == []:
@@ -76,7 +76,10 @@ class Users:
             
             user_created = self.cursor.fetchall()
             self.db.commit()
-            self.user_login(user_data['email_id'],user_data['password'])
+            try:
+                self.user_login(user_data['email_id'],user_data['password'])
+            except:
+                pass
             return user_created
         
         except Exception as error:
